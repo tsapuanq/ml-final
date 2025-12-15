@@ -22,31 +22,12 @@ from src.bot.ui import (
 
 log = logging.getLogger("tg-rag-bot")
 
-ALIASES = {
-    "dorm": "жатақхана общежитие общага dormitory price cost payment fee",
-    "fx": "foreign exchange валюта обмен курс rate",
-    "imo": "international office SDU visa documents",
-    "gpa": "grade point average балл оценка",
-    "ssc": "student service center SDU справка",
-    "spt": "student points transcript SDU справка",
-}
-
 
 def normalize_q(t: str) -> str:
     t = (t or "").strip()
     t = re.sub(r"^[\-\•\*\u2022]+\s*", "", t)
     t = re.sub(r"\s+", " ", t)
     return t
-
-
-def expand_query(q: str) -> str:
-    qn = q.lower().strip()
-    for k, extra in ALIASES.items():
-        if re.search(rf"\b{re.escape(k)}\b", qn):
-            return f"{q} {extra}"
-    if len(qn) <= 10 or len(qn.split()) <= 2:
-        return f"{q} что это такое объясни анықтама"
-    return q
 
 
 def debug_log(rag, user_q: str, rewritten_q: str, hits: list[dict], cand: list[tuple], answers_map: dict):
@@ -195,8 +176,7 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE, rag):
         hist_txt = format_history(context.user_data)
 
         rewritten = user_text
-        query_candidates = build_query_candidates(rewritten, expand_fn=expand_query)
-
+        query_candidates = build_query_candidates(rewritten)
         best_hits = []
         best_q = rewritten
         best_score = -1.0
@@ -229,7 +209,7 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE, rag):
                 if is_followup_llm(rag.client, user_text, hist_txt):
                     rewritten = rewrite_to_standalone(rag.client, user_text, hist_txt)
 
-                    query_candidates = build_query_candidates(rewritten, expand_fn=expand_query)
+                    query_candidates = build_query_candidates(rewritten)
 
                     best_hits = []
                     best_q = rewritten
