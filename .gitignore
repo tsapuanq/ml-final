@@ -1,0 +1,9 @@
+__pycache__
+.env
+*.pyc
+.DS_Store
+.venv/
+tg_rag/
+data
+old
+requirements.txt
