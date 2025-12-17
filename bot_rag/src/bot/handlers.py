@@ -94,7 +94,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=menu_kb(),
     )
 async def clear_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # полностью очищаем user_data (история, last payload, feedback flags)
     context.user_data.clear()
     await update.message.reply_text(
         "✅ Chat history cleared.\n"
@@ -119,13 +118,11 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = q.data
     last = context.user_data.get("last_answer_payload") or {}
 
-    # Always answer callback to stop Telegram loading spinner
     try:
         await q.answer()
     except Exception:
         pass
 
-    # Remove inline buttons after click (avoid multiple votes)
     try:
         await q.edit_message_reply_markup(reply_markup=None)
     except Exception:
@@ -151,15 +148,13 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE, rag):
     if not user_text:
         return
 
-    # ---- feedback comment mode (not part of history) ----
     if context.user_data.get("awaiting_feedback_text"):
         context.user_data["awaiting_feedback_text"] = False
         last = context.user_data.get("last_answer_payload") or {}
         log.info("NEG_FEEDBACK_COMMENT last=%s comment=%s", last, user_text)
-        await update.message.reply_text("Saved ✅ Thanks!", reply_markup=menu_kb())
+        await update.message.reply_text("Saved, thanks!", reply_markup=menu_kb())
         return
 
-    # ---- menu buttons (not part of history) ----
     if user_text == MENU_RULES:
         await update.message.reply_text(rules_text(), reply_markup=menu_kb())
         return
@@ -168,7 +163,6 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE, rag):
         await update.message.reply_text(examples_text(), reply_markup=menu_kb())
         return
 
-    # ---- normal question ----
     lang = detect_lang(user_text)
     nf = not_found_msg(lang)
 
@@ -181,11 +175,11 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE, rag):
         best_q = rewritten
         best_score = -1.0
 
-        emb_cache = {}  # ✅ embeddings per candidate text
+        emb_cache = {}  
 
         for qc in query_candidates:
             if qc not in emb_cache:
-                emb_cache[qc] = rag.embed(qc)  # ✅ embedding соответствует qc
+                emb_cache[qc] = rag.embed(qc)  
 
             hits_try = rag.search_hybrid_with_embedding(qc, emb_cache[qc], top_k=TOPK_INDEX)
             sc = float(hits_try[0].get("score", 0.0)) if hits_try else 0.0
@@ -199,7 +193,6 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE, rag):
         rewritten = best_q
         top0 = best_score
 
-        # 2) follow-up detection & rewrite
         followup_like = any(p in user_text.lower() for p in [
             "они", "это", "там", "про них", "а что", "подробнее", "нет про",
             "what about", "tell me more", "about it"
@@ -241,19 +234,16 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE, rag):
             await update.message.reply_text(nf, reply_markup=menu_kb())
             return
 
-        # 4) candidates -> answers_map
         cand = rag.pick_candidates(hits, max_unique=6)
         answer_ids = [aid for aid, _ in cand]
         answers_map = rag.fetch_answers(answer_ids)
 
-        # 5) optional rerank
         chosen_id = rag.rerank_if_needed(user_text, cand, answers_map)
         chosen = answers_map.get(chosen_id)
         if not chosen:
             await update.message.reply_text(nf, reply_markup=menu_kb())
             return
 
-        # 6) KNOWLEDGE blocks
         def get_ans(aid: int) -> str:
             row = answers_map.get(aid) or {}
             return (row.get("answer_clean") or row.get("answer") or "").strip()
@@ -276,7 +266,6 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE, rag):
 
         debug_log(rag, user_text, rewritten, hits, cand, answers_map)
 
-        # 7) generate answer strictly from knowledge (+ history only for references)
         final = generate_answer_from_knowledge(
             client=rag.client,
             user_question=user_text,
@@ -290,7 +279,6 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE, rag):
             log.warning("Verifier UNSUPPORTED. Falling back to raw KB. q=%s", user_text)
             final = kb0 if kb0 else nf
 
-        # 8) save payload for feedback
         context.user_data["last_answer_payload"] = {
             "question": user_text,
             "rewritten": rewritten,
@@ -300,10 +288,8 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE, rag):
             "ts": time.time(),
         }
 
-        # ✅ IMPORTANT: inline feedback buttons UNDER the answer
         await update.message.reply_text(final, reply_markup=feedback_inline_kb())
 
-        # 9) store real history
         push_history(context.user_data, "user", user_text)
         push_history(context.user_data, "assistant", final)
 

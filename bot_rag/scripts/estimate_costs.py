@@ -2,8 +2,7 @@ import os
 from dotenv import load_dotenv
 from supabase import create_client
 
-# Токены оценим приблизительно через длину текста.
-# Для RU/KK грубо: 1 токен ~ 3.2-4.0 символа. Возьмём 3.6 (консервативно).
+
 CHARS_PER_TOKEN = 3.6
 
 load_dotenv()
@@ -30,12 +29,9 @@ def main():
     answers = fetch_all("qa_answers", "answer_id,answer,lang")
     index_rows = fetch_all("qa_index", "index_id,search_text,lang,meta")
 
-    # 1) оценка чистки answers (answer -> answer_clean)
     total_in = sum(est_tokens(r.get("answer", "")) for r in answers)
-    # output примерно сравним по размеру (иногда чуть меньше). Возьмём 0.9x
     total_out = int(total_in * 0.9)
 
-    # 2) оценка перефразов для “rules”-строк (только где meta.source='rules' и короткие)
     rules = []
     for r in index_rows:
         meta = r.get("meta") or {}
@@ -45,11 +41,7 @@ def main():
         if src == "rules" and short:
             rules.append(r)
 
-    # допустим делаем 12 перефраз на строку
     paras_per = 12
-    # input на 1 запрос ~ (инструкции+вопрос) ~ 220 токенов
-    # output на 12 перефраз ~ 300 токенов
-    # сделаем оценку:
     para_in = len(rules) * 220
     para_out = len(rules) * 300
 

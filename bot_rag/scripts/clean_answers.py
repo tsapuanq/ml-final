@@ -41,7 +41,6 @@ def clean_one(answer: str, lang: str) -> str:
     return (r.output_text or "").strip()
 
 def main():
-    # берем где answer_clean пустой
     res = (sb.table("qa_answers")
            .select("answer_id,answer,lang,answer_clean")
            .is_("answer_clean", "null")

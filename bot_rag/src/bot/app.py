@@ -23,10 +23,8 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("clear", clear_cmd))
-    # ✅ inline feedback callbacks
     app.add_handler(CallbackQueryHandler(on_callback))
 
-    # messages (pass rag into handler)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, partial(on_text, rag=rag)))
 
     app.run_polling()

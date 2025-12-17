@@ -11,10 +11,6 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from supabase import create_client
 
-
-# ----------------------------
-# helpers
-# ----------------------------
 def _need(name: str) -> str:
     v = os.getenv(name)
     if not v:
@@ -53,12 +49,7 @@ def rpc_with_retry(call_fn, tries: int = 6, base_sleep: float = 1.0, label: str 
             time.sleep(sleep_s)
     raise last_err
 
-
-# ----------------------------
-# supabase ops
-# ----------------------------
 def upsert_answer(sb, row: Dict[str, Any]) -> int:
-    # Upsert by answer_hash, then fetch answer_id
     rpc_with_retry(
         lambda: sb.table("qa_answers").upsert(row, on_conflict="answer_hash").execute(),
         label="qa_answers.upsert",
@@ -89,9 +80,6 @@ def upsert_index_rows(sb, rows: List[Dict[str, Any]]):
     )
 
 
-# ----------------------------
-# main
-# ----------------------------
 def main():
     load_dotenv()
 
@@ -101,9 +89,8 @@ def main():
 
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
-    # throttle knobs (safe defaults)
-    SEED_BATCH = int(os.getenv("SEED_BATCH", "64"))               # embedding batch size
-    SEED_UPSERT_BATCH = int(os.getenv("SEED_UPSERT_BATCH", "100"))# upsert batch size
+    SEED_BATCH = int(os.getenv("SEED_BATCH", "64"))               
+    SEED_UPSERT_BATCH = int(os.getenv("SEED_UPSERT_BATCH", "100"))
     SLEEP_BETWEEN_EMBED = float(os.getenv("SEED_SLEEP_EMBED", "0.10"))
     SLEEP_BETWEEN_UPSERT = float(os.getenv("SEED_SLEEP_UPSERT", "0.20"))
 
@@ -112,9 +99,6 @@ def main():
 
     updated_at = now_iso()
 
-    # ----------------------------
-    # FACTS: answers (RU/KZ/EN) + queries per language
-    # ----------------------------
     FACTS: List[Dict[str, Any]] = [
         {
             "fact_key": "faculties",
@@ -306,7 +290,6 @@ def main():
                 ],
             },
         },
-        # UPDATED scholarship block (includes pedagogy)
         {
             "fact_key": "scholarship",
             "answers": {
@@ -374,7 +357,6 @@ def main():
                 ],
             },
         },
-        # SDU overview (updated with pedagogy scholarship + exact 52 372)
         {
             "fact_key": "sdu_overview",
             "answers": {
@@ -478,7 +460,6 @@ def main():
         },
     ]
 
-    # 1) upsert answers -> get answer_id per (fact_key, lang)
     lang_answer_ids: Dict[Tuple[str, str], int] = {}
     for f in FACTS:
         fact_key = f["fact_key"]
@@ -487,7 +468,7 @@ def main():
             a_hash = sha256(f"{lang}::{ans_clean}")
             row = {
                 "answer": ans,
-                "answer_clean": ans,  # keep same
+                "answer_clean": ans, 
                 "lang": lang,
                 "meta": {
                     "type": "fact",
@@ -502,7 +483,6 @@ def main():
             lang_answer_ids[(fact_key, lang)] = aid
             print(f"[OK] qa_answers upsert fact={fact_key} lang={lang} answer_id={aid}")
 
-    # 2) build index rows (answer_id, lang, search_text, embedding)
     triples: List[Tuple[int, str, str]] = []
     for f in FACTS:
         fact_key = f["fact_key"]
@@ -552,12 +532,11 @@ def main():
     before = len(index_rows)
     dedup = {}
     for r in index_rows:
-        dedup[r["search_hash"]] = r   # keeps last one if duplicates exist
+        dedup[r["search_hash"]] = r   
     index_rows = list(dedup.values())
     after = len(index_rows)
     print(f"[DEDUP] index_rows: {before} -> {after} (removed {before-after})")
     
-    # 3) upsert qa_index in batches
     print(f"\nUpserting {len(index_rows)} rows into qa_index...")
     for b in batched(index_rows, SEED_UPSERT_BATCH):
         upsert_index_rows(sb, b)

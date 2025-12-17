@@ -16,14 +16,12 @@ sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 EMB_MODEL = "text-embedding-3-small"
 
-# Настройки (агрессивно, но нормально)
 MAX_ITEMS = 350
 PARAS_PER = 12
 
 def norm(t: str) -> str:
     t = (t or "").strip()
     t = re.sub(r"\s+", " ", t)
-    # убрать маркеры типа "• "
     t = re.sub(r"^[\-\•\*\u2022]+\s*", "", t)
     return t
 
@@ -79,7 +77,6 @@ def gen_paraphrases(base: str, lang: str, n: int) -> List[str]:
                 x = norm(x)
                 if x:
                     out.append(x)
-        # uniq
         uniq, seen = [], set()
         for x in out:
             xl = x.lower()
@@ -91,7 +88,6 @@ def gen_paraphrases(base: str, lang: str, n: int) -> List[str]:
         return []
 
 def main():
-    # 1) берём кандидатов из БД
     res = sb.rpc("get_paraphrase_candidates", {"max_rows": MAX_ITEMS}).execute()
     cand = res.data or []
     print("candidates:", len(cand))
@@ -125,13 +121,11 @@ def main():
         done_rows.append({"base_search_hash": base_hash})
         time.sleep(0.05)
 
-    # 2) дедуп по search_hash
     dedup = {r["search_hash"]: r for r in new_rows}
     new_rows = list(dedup.values())
     print("new rows:", len(new_rows))
 
     if new_rows:
-        # 3) embeddings + upsert
         B = 200
         for i in tqdm(range(0, len(new_rows), B), desc="embed+upsert"):
             batch = new_rows[i:i+B]
@@ -141,7 +135,6 @@ def main():
             sb.table("qa_index").upsert(batch, on_conflict="search_hash").execute()
             time.sleep(0.10)
 
-    # 4) mark done
     sb.table("qa_paraphrase_done").upsert(done_rows, on_conflict="base_search_hash").execute()
     print("DONE")
 

@@ -17,8 +17,6 @@ sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 EMB_MODEL = "text-embedding-3-small"
 FETCH_LIMIT = 999999
 
-# Качество/стоимость: на старте ставь 0 (только rules).
-# Потом включим авто-перефразы отдельным шагом, выборочно.
 PARAPHRASES_PER_ITEM = 0
 
 KZ_CHARS = set("әөүұқғңһі")
@@ -72,7 +70,6 @@ def make_search_texts(question: str) -> List[str]:
         if re.search(rf"\b{re.escape(k)}\b", q_low):
             out.append(f"{q} {extra}")
 
-    # uniq
     uniq, seen = [], set()
     for t in out:
         t2 = normalize(t)
@@ -101,7 +98,6 @@ def fetch_qa_chunks(limit: int) -> List[Dict]:
         start += page
 
 def ensure_answer_ids(answer_hashes: List[str]) -> Dict[str, int]:
-    # читаем все ответы и строим map hash->id
     out = {}
     start = 0
     while True:
@@ -113,7 +109,6 @@ def ensure_answer_ids(answer_hashes: List[str]) -> Dict[str, int]:
         if len(rows) < 1000:
             break
         start += 1000
-    # проверим что все нужные хеши есть
     missing = [h for h in answer_hashes if h not in out]
     if missing:
         raise RuntimeError(f"Missing answer_ids for {len(missing)} answers (should not happen).")
@@ -123,7 +118,6 @@ def main():
     chunks = fetch_qa_chunks(FETCH_LIMIT)
     print("qa_chunks:", len(chunks))
 
-    # 1) распарсим и соберём unique answers
     parsed = []
     unique_answers = {}
     for row in tqdm(chunks, desc="parse"):
@@ -138,16 +132,13 @@ def main():
 
     print("unique answers:", len(unique_answers))
 
-    # 2) upsert answers
     answers_list = list(unique_answers.values())
     B = 500
     for i in tqdm(range(0, len(answers_list), B), desc="upsert qa_answers"):
         sb.table("qa_answers").upsert(answers_list[i:i+B], on_conflict="answer_hash").execute()
 
-    # 3) получим mapping answer_hash -> answer_id
     answer_id_map = ensure_answer_ids(list(unique_answers.keys()))
 
-    # 4) build index rows
     index_rows = []
     for rec in tqdm(parsed, desc="build index"):
         answer_id = answer_id_map[rec["ah"]]
@@ -166,7 +157,6 @@ def main():
                 "meta": {"source": "rules", "src_chunk_id": rec["src_id"]}
             })
 
-    # дедуп search_hash
     dedup = {}
     for r in index_rows:
         dedup[r["search_hash"]] = r
@@ -174,7 +164,6 @@ def main():
 
     print("qa_index rows:", len(index_rows))
 
-    # 5) embeddings + upsert index
     B = 200
     for i in tqdm(range(0, len(index_rows), B), desc="embed+upsert qa_index"):
         batch = index_rows[i:i+B]
