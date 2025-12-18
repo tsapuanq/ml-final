@@ -3,9 +3,9 @@ import logging
 from functools import partial
 
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
-from src.config import TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-from src.rag.rag2 import RAG2
-from src.bot.handlers import start, help_cmd, on_text, on_callback, clear_cmd
+from bot_rag.config import TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+from bot_rag.rag.rag2 import RAG2
+from bot_rag.bot.handlers import start, help_cmd, on_text, on_callback, clear_cmd
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("tg-rag-bot")

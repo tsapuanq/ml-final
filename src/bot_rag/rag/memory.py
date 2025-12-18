@@ -1,6 +1,6 @@
 #src/rag/memory.py
 from typing import List, Dict
-from src.config import HISTORY_MAX_TURNS
+from bot_rag.config import HISTORY_MAX_TURNS
 
 def push_history(user_data: dict, role: str, text: str):
     hist: List[Dict] = user_data.get("history", [])

@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple
 from openai import OpenAI
 from supabase import create_client
 
-from src.config import EMBEDDING_MODEL, RERANK_MODEL
+from bot_rag.config import EMBEDDING_MODEL, RERANK_MODEL
 
 class RAG2:
     def __init__(self, openai_api_key: str, supabase_url: str, supabase_service_key: str):

@@ -1,4 +1,4 @@
-#bot_rag/scripts/build_index_from_qa_chunks.py
+#pipelines/indexing/build_index_from_qa_chunks.py
 
 import os, re, hashlib, time
 from typing import List, Dict, Tuple

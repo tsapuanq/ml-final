@@ -4,17 +4,17 @@ import time
 import logging
 from telegram import Update, ReplyKeyboardRemove
 from telegram.ext import ContextTypes
-from src.rag.query_preprocess import build_query_candidates
-from src.config import TOPK_INDEX, SIM_NO_ANSWER, FOLLOWUP_MIN_SCORE, DEBUG
-from src.rag.lang import detect_lang, not_found_msg
-from src.rag.memory import push_history, format_history
-from src.rag.llm import (
+from bot_rag.rag.query_preprocess import build_query_candidates
+from bot_rag.config import TOPK_INDEX, SIM_NO_ANSWER, FOLLOWUP_MIN_SCORE, DEBUG
+from bot_rag.rag.lang import detect_lang, not_found_msg
+from bot_rag.rag.memory import push_history, format_history
+from bot_rag.rag.llm import (
     is_followup_llm,
     rewrite_to_standalone,
     generate_answer_from_knowledge,
     verify_answer_supported,
 )
-from src.bot.ui import (
+from bot_rag.bot.ui import (
     menu_kb, feedback_inline_kb,
     MENU_RULES, MENU_EXAMPLES,
     CB_FB_UP, CB_FB_DOWN

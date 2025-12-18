@@ -152,7 +152,7 @@ def main():
     ap.add_argument("--qa_index_csv", required=True)
     ap.add_argument("--eval_csv", required=True, help="exclude leakage: answer_id in eval")
     ap.add_argument("--topk", type=int, default=20)
-    ap.add_argument("--out", default="data/research/ltr_train.csv")
+    ap.add_argument("--out", default="data/exports/ltr_train.csv")
     ap.add_argument("--limit", type=int, default=5000)
     ap.add_argument("--sleep", type=float, default=0.0, help="sleep between queries (seconds)")
     ap.add_argument("--resume", action="store_true", help="resume if out exists (recommended)")

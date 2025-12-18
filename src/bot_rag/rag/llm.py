@@ -1,8 +1,8 @@
 #src/rag/llm.py
 
 from openai import OpenAI
-from src.config import REWRITE_MODEL, ANSWER_MODEL, VERIFIER_MODEL
-from src.rag.lang import not_found_msg
+from bot_rag.config import REWRITE_MODEL, ANSWER_MODEL, VERIFIER_MODEL
+from bot_rag.rag.lang import not_found_msg
 
 def is_followup_llm(client: OpenAI, question: str, hist_txt: str) -> bool:
     if not hist_txt.strip():

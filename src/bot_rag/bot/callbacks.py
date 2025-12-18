@@ -2,7 +2,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from src.bot.ui import CB_RULES, CB_EXAMPLES, rules_text, examples_text, start_inline_kb
+from bot_rag.bot.ui import CB_RULES, CB_EXAMPLES, rules_text, examples_text, start_inline_kb
 
 
 async def on_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
