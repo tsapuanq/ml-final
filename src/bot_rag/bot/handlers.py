@@ -78,9 +78,9 @@ def examples_text() -> str:
         "• 'Welcome party' деген не??\n"
         "• When can I learn retakes?\n"
         "• Где посмотреть pre-final\n"
-        "• How to use Moodle?\n"
+        "• Сколько стипендия у студентов?\n"
         "• Kак получить справку с места учебы?\n"
-        "• 1 кредиттің бағасы қанша?\n"
+        "• Сколько нужно баллов на грант на economics?\n"
     )
 
 
