@@ -1,84 +1,90 @@
-# SDU RAG Bot — структура проекта
+# SDU AI Assistant — Multilingual RAG Chatbot (RU/KZ/EN)
+
+AI-ассистент для студентов SDU: отвечает на частые вопросы про учебу, MySDU, пересдачи, общежитие, правила, поступление и программы обучения.  
+Проект построен на Retrieval-Augmented Generation (RAG): сначала находим релевантный ответ в базе знаний, затем (опционально) формируем финальный ответ через LLM строго на основе найденного контекста.
+
+## Why this matters
+В SDU информация часто “размазана” по сайту, чатам и устным источникам.  
+Цель проекта — сделать единый канал быстрых и одинаково корректных ответов 24/7, снизив нагрузку на эдвайзеров и старшекурсников.
+
 ---
 
-## Дерево проекта (с комментариями)
+## Key Features
+- **Multilingual support:** Kazakh / Russian / English
+- **Hybrid retrieval (production):** Vector search + Trigram search (pg_trgm)  
+- **Robust to short queries & slang:** query preprocessing + canonical term expansion (например: *“мудл” → “moodle”*)
+- **Supabase PostgreSQL backend:** хранение знаний + индексы + RPC функции поиска
+- **Optional ML reranking (XGBoost / Logistic Regression):** обученный Learning-to-Rank для top-N кандидатов (можно включать только “когда не уверены”)
+- **Telegram bot demo:** пользовательский интерфейс через Telegram
 
-```text
-.
-├── .env                          # переменные окружения (ключи, URL’ы, токены)
-├── .gitignore                    # что не коммитить в git
-├── data                          # ВСЕ данные проекта: сырьё → обработка → экспорт → оценка
-│   ├── eval                       # файлы для оценки качества (ручная разметка/выборки/кэш переписываний)
-│   │   ├── eval_manual_curated.csv
-│   │   ├── eval_random_stratified.csv
-│   │   └── rewrite_cache.json
-│   ├── exports                    # выгрузки/артефакты пайплайнов (таблицы, датасеты, результаты)
-│   │   ├── ltr_train.csv
-│   │   ├── qa_answers_rows.csv
-│   │   ├── qa_chunks_rows.csv
-│   │   ├── qa_index_rows.csv
-│   │   └── qa_paraphrase_done_rows.csv
-│   ├── logs                       # логи работы пайплайнов/бота (события, отладка)
-│   │   └── events.jsonl
-│   ├── processed                  # обработанные версии датасетов (очищено/нормализовано/подготовлено)
-│   │   ├── embedding_ml_full.csv
-│   │   └── QA_clean_base.csv
-│   └── raw                        # сырые исходники: как пришло/скачалось/спарсилось
-│       ├── provided_dataset.csv
-│       ├── QA_raw.csv
-│       ├── sdu_bachelor_programs.csv
-│       └── sdu_bachelor_programs.json
-├── docs                           # документация проекта и инфраструктуры
-│   └── supabase                   # всё, что относится к БД Supabase/Postgres
-│       ├── functions.sql          # SQL-функции/процедуры (если используете)
-│       ├── README.md              # заметки по Supabase (как развёрнуть/настроить)
-│       └── schema.sql             # схема таблиц (DDL), индексы, структуры БД
-├── ml                             # машинное обучение (LTR/ранжирование), офлайн обучение моделей
-│   ├── __init__.py
-│   ├── models                     # сохранённые обученные модели (артефакты обучения)
-│   │   ├── ltr_logreg.joblib
-│   │   └── ltr_xgb.joblib
-│   └── scripts                    # обучение/оценка/сбор датасета для LTR
-│       ├── __init__.py
-│       ├── build_ltr_dataset.py
-│       ├── eval_recall.py
-│       ├── train_ltr_logreg.py
-│       └── train_ltr_xgb.py
-├── notebooks                      # исследовательские ноутбуки (EDA, эксперименты)
-│   └── EDA.ipynb
-├── pipelines                      # конвейеры: ingestion → indexing → evaluation (производственный “ETL”)
-│   ├── __init__.py
-│   ├── evaluation                 # оценка retrieval/качества поиска
-│   │   ├── __init__.py
-│   │   └── eval_recall.py
-│   ├── indexing                   # построение индексов/эмбеддингов/подготовка таблиц под поиск
-│   │   ├── __init__.py
-│   │   ├── build_index_from_qa_chunks.py
-│   │   ├── clean_answers.py
-│   │   └── expand_index_paraphrases_v2.py
-│   └── ingestion                  # загрузка/подготовка фактов и Q/A из сырья в БД
-│       ├── __init__.py
-│       ├── cleaning_script.py
-│       ├── ingest_sdu_programs_json.py
-│       └── sdu_scrape.py
-├── README.md                      # основной README проекта (этот файл/или общий)
-├── requirements.txt               # зависимости Python
-└── src                            # основной “продуктовый” код: бот + RAG
-    └── bot_rag
-        ├── __init__.py
-        ├── add                    # утилиты для добавления/сидирования фактов (быстрый старт/наполнение)
-        │   └── seed_facts.py
-        ├── bot                    # Telegram-бот (точка входа, handlers, UI, callbacks)
-        │   ├── __init__.py
-        │   ├── app.py
-        │   ├── callbacks.py
-        │   ├── handlers.py
-        │   └── ui.py
-        ├── config.py              # конфиги бота/RAG (ключи, режимы, параметры, лимиты)
-        └── rag                    # ядро RAG: поиск, подготовка запроса, LLM, память
-            ├── __init__.py
-            ├── lang.py
-            ├── llm.py
-            ├── memory.py
-            ├── query_preprocess.py
-            └── rag2.py
+---
+
+## Architecture (High-Level)
+1) User query → preprocessing (канонизация терминов, исправление вариантов написания)  
+2) Embedding запроса (OpenAI text-embedding)  
+3) **Hybrid retrieval** из Supabase:
+   - Vector similarity по embedding
+   - Trigram similarity по search_text
+   - Итоговый score = 0.8 * vector_sim + 0.2 * trigram_sim  
+4) Выбор топ-кандидатов (dedup по answer_id)  
+5) (Опционально) rerank (ML/LLM) только если retrieval “не уверен”  
+6) Ответ берётся из `qa_answers.answer_clean` и может быть:
+   - отправлен напрямую, или
+   - использован как KNOWLEDGE для генерации ответа LLM (строгий режим без галлюцинаций)
+
+---
+
+## Database Design (Supabase / PostgreSQL)
+Мы храним знания в 3 слоя:
+
+- **qa_chunks** — “сырой” слой: исходные Q/A чанки (после слияния источников) + embedding  
+- **qa_answers** — уникальные ответы (дедупликация, хранение clean-версии)  
+- **qa_index** — поисковый индекс:
+  - множество вариантов формулировок (search_text) → один `answer_id`
+  - embedding для vector search
+  - metadata (язык, источники, оригинальная формулировка)
+
+Это позволяет:
+- не дублировать ответы
+- добавлять много перефразов к одному ответу
+- делать устойчивый поиск под реальную речь пользователей
+
+---
+
+## Retrieval Methods Compared
+Мы честно сравнили несколько подходов на одном evaluation set и одинаковом candidate pool size (top-N):
+
+1. **Vector-only** (`match_qa_vector`)
+2. **Trigram-only** (`match_qa_trigram`)
+3. **Hybrid** (`match_qa_hybrid`) ✅ выбран в прод
+4. **LTR Logistic Regression rerank**
+5. **LTR XGBoost rerank**
+
+**Почему Hybrid в проде:** качество почти как у XGBoost, но:
+- не требует переобучения и мониторинга модели,
+- проще поддерживать,
+- стабильнее при изменении данных.
+
+---
+
+## Metrics
+Мы использовали retrieval-метрики, которые отвечают на вопрос:
+“Нашёлся ли правильный ответ в топ-K?”
+
+- **Recall@K** (K = 1, 3, 5, 10, 20)
+- **MRR@K** — учитывает позицию правильного ответа (чем выше — тем лучше)
+
+Пример интерпретации:
+- Recall@1 = 0.97 → в 97% случаев правильный answer_id на 1 месте.
+
+---
+
+## Results (Final)
+Итоги запуска (same candidate pool):
+
+- **LTR XGBoost rerank:** Recall@1 ≈ 0.975 (best)
+- **Hybrid Rank:** Recall@1 ≈ 0.973 (почти на уровне)
+- **Vector-only:** Recall@1 ≈ 0.785
+- **Trigram-only:** Recall@1 ≈ 0.506
+
+Вывод: Hybrid даёт почти максимум качества при минимальной сложности внедрения.
