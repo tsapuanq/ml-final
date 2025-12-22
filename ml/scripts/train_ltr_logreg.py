@@ -1,3 +1,4 @@
+#ml/scripts/train_ltr_logreg.py
 import joblib
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
@@ -29,7 +30,6 @@ def main():
 
     df = pd.read_csv(args.train_csv)
 
-    # group by (query, gold_answer_id) to avoid leakage
     df["group_key"] = df["query"].astype(str) + "||" + df["gold_answer_id"].astype(str)
 
     tr_df, te_df = split_by_group(df, group_col="group_key", test_size=0.2, seed=42)

@@ -15,16 +15,13 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-# ВАЖНО: модель эмбеддинга должна совпадать с той, что использует твой RAG при поиске
-# (иначе размерность будет отличаться и/или качество будет хуже).
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
 
-# OpenAI ключ обязателен (если нет — скрипт упадёт с понятной ошибкой)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 TABLE_QA_CHUNKS = "qa_chunks"
-BATCH_SIZE = 128          # эмбеддинги лучше считать небольшими батчами
-INSERT_BATCH_SIZE = 200   # в Supabase можно вставлять крупнее
+BATCH_SIZE = 128    
+INSERT_BATCH_SIZE = 200  
 
 
 def sha1(s: str) -> str:
@@ -46,7 +43,6 @@ def build_answer_prefix(program_name: str, faculty_name: str, program_id: str, f
 
 
 def q_templates(lang: str) -> Dict[str, List[str]]:
-    # Чуть расширил: добавил короткие варианты “как обычно спрашивают”.
     if lang == "en":
         return {
             "about": [
@@ -121,7 +117,6 @@ def q_templates(lang: str) -> Dict[str, List[str]]:
             ],
         }
 
-    # ru
     return {
         "about": [
             "О чём программа {program}?",
@@ -219,8 +214,6 @@ def make_qa_rows(data: Dict[str, Any]) -> List[str]:
                     a = norm(a)
                     if not q or not a:
                         return
-                    # Добавим минимальный “паспорт” в ответ (без meta-колонки)
-                    # чтобы в дальнейшем можно было понять источник и контекст.
                     a2 = f"{prefix}{a} (source={source}, level={degree_level}, v={schema_version}, field={field})"
                     text_chunk = f"Вопрос: {q}\nОтвет: {a2}"
                     h = sha1(text_chunk.lower())
@@ -277,7 +270,6 @@ def embed_texts(client, texts: List[str]) -> List[List[float]]:
     """
     Делает embeddings.create() и возвращает список векторов (list[float]).
     """
-    # encoding_format="float" чтобы сразу получить list[float]
     resp = client.embeddings.create(
         model=EMBEDDING_MODEL,
         input=texts,
@@ -297,12 +289,10 @@ def insert_qa_chunks(text_chunks: List[str], sleep_s: float = 0.15):
     print(f"Embedding model: {EMBEDDING_MODEL}")
     print(f"Embedding batch size: {BATCH_SIZE}, Insert batch size: {INSERT_BATCH_SIZE}")
 
-    # 1) сначала считаем embeddings батчами
     embeddings: List[List[float]] = []
     for i in tqdm(range(0, len(text_chunks), BATCH_SIZE), desc="embed"):
         batch = text_chunks[i:i + BATCH_SIZE]
 
-        # retry на случай временных ошибок сети/лимитов
         for attempt in range(5):
             try:
                 embs = embed_texts(client, batch)
@@ -318,13 +308,11 @@ def insert_qa_chunks(text_chunks: List[str], sleep_s: float = 0.15):
     if len(embeddings) != len(text_chunks):
         raise RuntimeError("Embedding count mismatch. Something went wrong.")
 
-    # 2) вставляем в Supabase
     payload = [{"text_chunk": t, "embedding": e} for t, e in zip(text_chunks, embeddings)]
 
     for i in tqdm(range(0, len(payload), INSERT_BATCH_SIZE), desc="insert qa_chunks"):
         chunk = payload[i:i + INSERT_BATCH_SIZE]
 
-        # retry на insert
         for attempt in range(5):
             try:
                 sb.table(TABLE_QA_CHUNKS).insert(chunk).execute()

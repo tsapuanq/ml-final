@@ -9,6 +9,5 @@ requirements.txt
 models
 data
 
-# generated exports
 /data/exports/qa_chunks_rows.csv
 /data/exports/qa_index_rows.csv

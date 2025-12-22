@@ -20,8 +20,6 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 
 EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
 
-
-# -------------------- clients --------------------
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 def make_supabase():
@@ -29,8 +27,6 @@ def make_supabase():
 
 sb = make_supabase()
 
-
-# -------------------- retry helpers --------------------
 def with_retry(fn, *, tries: int = 6, base_sleep: float = 1.0, label: str = ""):
     last_err = None
     for attempt in range(tries):
@@ -65,7 +61,6 @@ def rpc_with_retry(fn_name: str, payload: dict, *, tries: int = 6, base_sleep: f
             last_err = e
             print(f"[WARN] RPC {fn_name} failed attempt={attempt+1}/{tries}: {type(e).__name__}: {e}")
 
-            # IMPORTANT: recreate client on failures (fixes HTTP2 EOF / broken pool)
             try:
                 sb = make_supabase()
             except Exception as e2:
@@ -77,7 +72,6 @@ def rpc_with_retry(fn_name: str, payload: dict, *, tries: int = 6, base_sleep: f
     raise last_err
 
 
-# -------------------- rpc wrappers --------------------
 def rpc_vector(q_emb, topk):
     return rpc_with_retry("match_qa_vector", {"query_embedding": q_emb, "match_count": topk})
 
@@ -87,8 +81,6 @@ def rpc_trigram(q_text, topk):
 def rpc_hybrid(q_text, q_emb, topk):
     return rpc_with_retry("match_qa_hybrid", {"query_text": q_text, "query_embedding": q_emb, "match_count": topk})
 
-
-# -------------------- feature merge --------------------
 def merge_feats(v, t, h):
     feats: Dict[int, Dict[str, float]] = {}
 
@@ -115,7 +107,6 @@ def merge_feats(v, t, h):
     return out
 
 
-# -------------------- resume support --------------------
 def load_done_queries(out_path: str) -> Set[Tuple[str, int]]:
     """
     Return set of (query, gold_answer_id) already written to out csv.
@@ -145,8 +136,6 @@ def ensure_parent_dir(path: str):
     if d:
         os.makedirs(d, exist_ok=True)
 
-
-# -------------------- main --------------------
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--qa_index_csv", required=True)
@@ -163,7 +152,6 @@ def main():
 
     eval_answer_ids = set(eval_df["answer_id"].astype(int).tolist())
 
-    # avoid leakage: remove rows whose answer_id appears in eval set
     df = df[~df["answer_id"].astype(int).isin(eval_answer_ids)].copy()
 
     if args.limit and len(df) > args.limit:
@@ -192,7 +180,6 @@ def main():
         if not out_exists:
             writer.writeheader()
 
-        # progress bar over rows, but we'll skip already-done items
         for _, r in tqdm(df.iterrows(), total=len(df)):
             q = str(r["search_text"])
             gold = int(r["answer_id"])
@@ -202,14 +189,12 @@ def main():
 
             q_emb = embed(q)
 
-            # RPCs with retry + client recreate
             v = rpc_vector(q_emb, args.topk)
             t = rpc_trigram(q, args.topk)
             h = rpc_hybrid(q, q_emb, args.topk)
 
             feats = merge_feats(v, t, h)
 
-            # write immediately so crash doesn't lose progress
             for feat in feats:
                 row_out = {
                     "query": q,

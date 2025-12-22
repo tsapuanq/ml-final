@@ -543,7 +543,7 @@ def main():
         print(f"[OK] qa_index upserted batch size={len(b)}")
         time.sleep(SLEEP_BETWEEN_UPSERT)
 
-    print("\nDONE ✅ Facts seeded successfully.")
+    print("\nDONE! Facts seeded successfully.")
     print(f"Total qa_index rows prepared: {len(index_rows)}")
 
 

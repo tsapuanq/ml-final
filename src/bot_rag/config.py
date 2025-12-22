@@ -1,7 +1,7 @@
+#src/bot_rag/config.py
 import os
 from dotenv import load_dotenv
 
-# Load .env BEFORE reading os.environ
 load_dotenv()
 
 def _need(name: str) -> str:
